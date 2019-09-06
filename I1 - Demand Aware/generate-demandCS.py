@@ -13,3 +13,8 @@ for i in range(demandJ.size):
 	if demandJ[i]<=0:
 		demandJ[i] = -1 * demandJ[i]
 		print(demandJ[i],"--Changed!")
+
+np.save("demand_cs.npy",demandJ)
+
+# demand_loaded = np.load("demand_cs.npy")
+# print(demand_loaded.mean())
