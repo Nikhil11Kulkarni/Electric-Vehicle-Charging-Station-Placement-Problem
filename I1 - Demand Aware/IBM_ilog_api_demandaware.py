@@ -9,11 +9,12 @@ import numpy as np
 # import osmnx as ox
 import pandas as pd
 import matplotlib
+import math
 import matplotlib.pyplot as plt
 # ox.config(log_console=True, use_cache=True)
 matplotlib.use('Qt5Agg')
 # getting the distance matrix 
-Distance = np.loadtxt('test_original.out', delimiter=',')   # X is an array
+Distance = np.loadtxt('test007.out', delimiter=',')   # X is an array
 Distance.shape
 Obj_value=[]
 Opened_stations=[]
@@ -24,7 +25,7 @@ for i in range(20,21):
     Fixed = 10000000; #Fixed cost for opening each of the charging stations
     Maximum=i;
     NbWarehouses = 289; #NbWarehouses is the candidate charging points
-    NbStores = 153; # Nbstores is the demand points
+    NbStores = 803; # Nbstores is the demand points
     Stores = range(NbStores); # from zero to no of stores
     N_Warehouses = range(NbWarehouses);
     #int Capacity[N_Warehouses] = ...;
@@ -36,7 +37,7 @@ for i in range(20,21):
     model = Model("Charging station-Demand Aware")
     budget_charging_points = 100 # 20 CS * 5 mean
     # supply = model.binary_var_matrix(keys1=NbStores, keys2=NbWarehouses,key_format ="supply" )
-    num_charging_points = model.binary_var_list(keys=NbWarehouses )
+    num_charging_points = model.integer_var_list(keys=NbWarehouses )
     model.add_constraint(model.sum(num_charging_points[ind] for ind in range(NbWarehouses)) <= budget_charging_points )
 
     # for s in range(NbStores):
@@ -47,7 +48,7 @@ for i in range(20,21):
     #     for w in range(NbWarehouses):
     #         model.add_constraint(supply[s,w]<= Open[w])                           
     # model.print_information()
-    
+    model.add_constraint(model.sum((num_charging_points[w]>=1) for w in range(NbWarehouses)) <= Maximum)
     # model.add_constraint(model.sum(Open[w] for w in range(NbWarehouses)) <= Maximum)                           
     # model.print_information()
     
@@ -64,8 +65,13 @@ for i in range(20,21):
 
     # fixed_value = model.sum(Fixed * Open[w] for w in N_Warehouses )
     # model.add_kpi(fixed_value, "Fixed cost")
-    # reward_d = model.sum((min(DemandJ[ind],utility*num_charging_points[ind])) for ind in range(len(num_charging_points)))
-    reward_d = model.sum(utility*num_charging_points[ind] for ind in range(len(num_charging_points)))
+    # CHECK --
+    reward_d = model.sum((utility*num_charging_points[ind]+ DemandJ[ind] )/2 for ind in range(len(num_charging_points)))
+    # reward_d = model.sum((-1)*math.exp(DemandJ[ind]-utility*num_charging_points[ind]) for ind in range(len(num_charging_points)))
+
+    # a_push = (utility*num_charging_points) #[ind]
+    # b_push = (DemandJ) #[ind]
+    # reward_d = model.sum((a_push[ind]*(a_push[ind]<=b_push[ind]) +b_push[ind]*(b_push[ind]<=a_push[ind])) for ind in range(len(num_charging_points)))
 
     model.add_kpi(reward_d, "Reward Demand")
     reward_c = model.sum( (Distance[s][w]<=radius) for w in N_Warehouses for s in Stores)
@@ -75,22 +81,25 @@ for i in range(20,21):
     msol=model.solve()
     solution=model.report()
     Obj_value+=[model.objective_value]
-    O=msol.get_values(Open);
+    print("num_charging_points:",num_charging_points)
+    O=msol.get_values(num_charging_points);
     Opened_stations+=[O.count(1)]
    
 
 # In[]
 
-supply_value= [ [ supply[s,w] for w in N_Warehouses] for s in Stores]
-Total_supply_value = [sum(supply_value[s][w]  for w in N_Warehouses) for s in Stores]
+# supply_value= [ [ supply[s,w] for w in N_Warehouses] for s in Stores]
+# Total_supply_value = [sum(supply_value[s][w]  for w in N_Warehouses) for s in Stores]
 
 # In[57]:
 
 
+print("\n\n------------")
+
 from sys import stdout
 if msol:
     stdout.write("Solution:")
-    for v in Open:        
+    for v in num_charging_points:        
         stdout.write(" " + str(msol[v])+" "+str(v))
     stdout.write("\n")
 else:
@@ -100,19 +109,19 @@ else:
 # In[58]:
 
 
-S=msol.get_value_dict(supply);
+# S=msol.get_value_dict(supply);
 
 
 # In[59]:
 
 
-print( S.keys())
+# print( S.keys())
 
 
 # In[60]:
 
 
-O=msol.get_values(Open);
+# O=msol.get_values(Open);
 
 
 # In[61]:
@@ -138,7 +147,7 @@ print(msol.solve_details)
 
 
 #read the demand and charging points from the excel sheet created by the 
-file = 'demand.xlsx'
+file = 'demand2.xlsx'
 demand = pd.ExcelFile(file)
 print(demand.sheet_names)
 
